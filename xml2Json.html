@@ -1,0 +1,120 @@
+<!--Please use VS Code Live Server extension when testing the following program
+// ------------------
+// Here's secrity restrictions that modern browsers block XMLHttpRequest/Fetch API 
+// from loading local files directly (file:// protocol) due to CORS policies.
+//
+//Running via localhost (http:// protocol) simulates a real 
+//web server environment, allowing proper resource loading and API testing.
+//
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>JSON Output</title>
+    <style>
+        body {
+          font-family: monospace;
+        }
+    
+        #xmlToJSON {
+          margin-top: 20px;
+          line-height: 25px;
+        }
+      </style>
+</head>
+<body>
+    <h2>Convert XML to JSON </h2>
+    <div>
+      <h4>XML:</h4>
+      <textarea id="xmlString" cols="55" rows="15"></textarea>
+    </div>
+    <button id="xmlToJSON">Convert XML to JSON</button>
+    <div>
+        <h4>JSON Output:</h4>
+        <textarea id="jsonString" cols="55" rows="15"></textarea>
+      </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+          fetch('./data.xml')
+            .then(response => response.text())
+            .then(xmlContent => {
+              // Display content within textarea
+              document.getElementById('xmlString').value = xmlContent;
+            })
+            .catch(error => {
+              console.error('Failed to loading XML content:', error);
+              alert('Failed to loading XML content, please check the file name and path！Please running the program with live Server to avoid fetch error');
+            });
+        });
+        document.getElementById('xmlToJSON').addEventListener('click', function() {
+            try {
+                const xmlString = document.getElementById('xmlString').value;
+                let jsonResult = xmlToJson(xmlString);
+                jsonResult = processLeadingZeros(jsonResult);
+                document.getElementById('jsonString').value = 
+                    JSON.stringify(jsonResult, null, 4);
+            } catch (error) {
+                console.error('Faild to convert:', error);
+                alert('Error log: ' + error.message);
+            }
+        });
+        function xmlToJson(xmlString) {
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlString, "text/xml");
+            
+            if (xmlDoc.querySelector('parsererror')) {
+                throw new Error('Invalid XML format');
+            }
+
+            function mapJson(node) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    return node.textContent.trim() || null;
+                }
+
+                const children = Array.from(node.childNodes);
+                const isSingleText = children.length === 1 && children[0].nodeType === Node.TEXT_NODE;
+
+                if (isSingleText) {
+                    return children[0].textContent.trim();
+                }
+
+                return children.reduce((obj, child) => {
+                    if (child.nodeType === Node.ELEMENT_NODE) {
+                        const key = child.nodeName;
+                        const value = mapJson(child);
+                        obj[key] = obj[key] ? [].concat(obj[key], value) : value;
+                    }
+                    return obj;
+                }, {});
+            }
+            return { 
+                [xmlDoc.documentElement.nodeName]: mapJson(xmlDoc.documentElement)
+            };
+        }
+
+        function processLeadingZeros(obj) {
+            const targetFields = [
+                'VendorNumber__',
+                'DocNumber__',
+                'Material__'
+            ];
+            function removeZeros(currentObj) {
+                for (const key in currentObj) {
+                    if (targetFields.includes(key)) {
+                        currentObj[key] = currentObj[key].replace(/^0+/, '')
+                    }
+                    if (typeof currentObj[key] === 'object' && currentObj[key] !== null) {
+                        removeZeros(currentObj[key]);
+                    }
+                }
+            }
+            removeZeros(obj);
+            return obj;
+        }
+    </script>
+</body>
+</html>
